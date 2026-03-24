@@ -315,7 +315,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final power = metrics?['power'] ??
             (_mqttService.power > 0 ? _mqttService.power : null);
         final apparentPower =
-            voltage != null && current != null ? voltage * current : null;
+            voltage != null && current != null
+            ? voltage * (current / 1000.0)
+            : null;
         final powerFactor =
             apparentPower != null && apparentPower > 0 && power != null
             ? ((power * 1000.0) / apparentPower).clamp(0.0, 1.0)
@@ -337,7 +339,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _buildMetricCard(
               'Current',
-              current != null ? '${(current * 1000).toStringAsFixed(0)} mA' : '-',
+              current != null ? '${current.toStringAsFixed(0)} mA' : '-',
               Icons.electric_bolt,
               Colors.blue,
             ),

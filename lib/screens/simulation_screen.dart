@@ -15,6 +15,8 @@ class SimulationScreen extends StatefulWidget {
 
 class _SimulationScreenState extends State<SimulationScreen> {
   final MqttService _mqttService = MqttService();
+  StreamSubscription<RelayState>? _relayStateSubscription;
+  StreamSubscription<bool>? _connectionSubscription;
 
   // Simulation parameters
   double _loadPercent = 60.0;
@@ -46,6 +48,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
   void initState() {
     super.initState();
     _mqttService.registerScreen();
+    _syncConnectionStateFromService();
+    _syncRelayStateFromService();
+    _listenToMqttState();
     _connectMqtt();
     _startHealthMonitor();
   }
@@ -54,8 +59,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
     setState(() => _isConnecting = true);
     try {
       final connected = await _mqttService.connect();
+      _syncRelayStateFromService();
       setState(() {
-        _isMqttConnected = connected;
+        _isMqttConnected = connected || _mqttService.isConnected;
         _isConnecting = false;
       });
       if (connected) {
@@ -78,6 +84,27 @@ class _SimulationScreenState extends State<SimulationScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  void _listenToMqttState() {
+    _relayStateSubscription = _mqttService.relayStateStream.listen((_) {
+      if (!mounted) return;
+      setState(_syncRelayStateFromService);
+    });
+
+    _connectionSubscription = _mqttService.connectionStream.listen((_) {
+      if (!mounted) return;
+      setState(_syncConnectionStateFromService);
+    });
+  }
+
+  void _syncRelayStateFromService() {
+    _relay1On = _mqttService.relay1On;
+    _relay2On = _mqttService.relay2On;
+  }
+
+  void _syncConnectionStateFromService() {
+    _isMqttConnected = _mqttService.isConnected;
   }
 
   void _startHealthMonitor() {
@@ -204,6 +231,8 @@ class _SimulationScreenState extends State<SimulationScreen> {
   @override
   void dispose() {
     _healthCheckTimer?.cancel();
+    _relayStateSubscription?.cancel();
+    _connectionSubscription?.cancel();
     _mqttService.disposeScreen();
     super.dispose();
   }
