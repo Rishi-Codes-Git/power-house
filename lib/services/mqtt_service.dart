@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
@@ -30,6 +31,18 @@ class MqttService {
   static const String topicVoltage = 'powerhouse/metrics/voltage';
   static const String topicCurrent = 'powerhouse/metrics/current';
   static const String topicPower = 'powerhouse/metrics/power';
+    static const String topicTransformer = 'powerhouse/transformer';
+    static const String topicTransformerVoltage =
+      'powerhouse/transformer/voltage';
+    static const String topicTransformerCurrent =
+      'powerhouse/transformer/current';
+    static const String topicTransformerPower = 'powerhouse/transformer/power';
+    static const String topicTransformerWildcard = 'powerhouse/transformer/#';
+    static const String topicMetricsWildcard = 'powerhouse/metrics/#';
+    static const String topicTransformerBareVoltage = 'transformer/voltage';
+    static const String topicTransformerBareCurrent = 'transformer/current';
+    static const String topicTransformerBarePower = 'transformer/power';
+    static const String topicTransformerBareWildcard = 'transformer/#';
 
   MqttServerClient? _client;
 
@@ -69,10 +82,12 @@ class MqttService {
   double _voltage = 0.0;
   double _current = 0.0;
   double _power = 0.0;
+  DateTime? _lastMetricsAt;
 
   double get voltage => _voltage;
   double get current => _current;
   double get power => _power;
+  DateTime? get lastMetricsAt => _lastMetricsAt;
 
   // Called when a screen starts using the MQTT service
   void registerScreen() {
@@ -131,10 +146,20 @@ class MqttService {
         _client!.subscribe(topicRelay2State, MqttQos.atLeastOnce);
         _client!.subscribe(topicStatus, MqttQos.atLeastOnce);
 
-        // Subscribe to metrics topics
+        // Subscribe to metrics topics (support both metrics/* and transformer/*)
         _client!.subscribe(topicVoltage, MqttQos.atLeastOnce);
         _client!.subscribe(topicCurrent, MqttQos.atLeastOnce);
         _client!.subscribe(topicPower, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformer, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerVoltage, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerCurrent, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerPower, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerWildcard, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMetricsWildcard, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerBareVoltage, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerBareCurrent, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerBarePower, MqttQos.atLeastOnce);
+        _client!.subscribe(topicTransformerBareWildcard, MqttQos.atLeastOnce);
 
         // Listen to messages
         _client!.updates!.listen(_onMessage);
@@ -194,15 +219,26 @@ class MqttService {
         _lastStatus = 'Device status: $payload';
       }
       // Handle metrics updates
-      else if (topic == topicVoltage) {
-        _voltage = double.tryParse(payload) ?? _voltage;
-        _emitMetrics();
-      } else if (topic == topicCurrent) {
-        _current = double.tryParse(payload) ?? _current;
-        _emitMetrics();
-      } else if (topic == topicPower) {
-        _power = double.tryParse(payload) ?? _power;
-        _emitMetrics();
+      else if (_isVoltageTopic(topic)) {
+        final parsed = _parseMetricPayload(payload);
+        if (parsed != null) {
+          _voltage = parsed;
+          _emitMetrics();
+        }
+      } else if (_isCurrentTopic(topic)) {
+        final parsed = _parseMetricPayload(payload);
+        if (parsed != null) {
+          _current = parsed;
+          _emitMetrics();
+        }
+      } else if (_isPowerTopic(topic)) {
+        final parsed = _parseMetricPayload(payload);
+        if (parsed != null) {
+          _power = parsed;
+          _emitMetrics();
+        }
+      } else if (topic == topicTransformer) {
+        _parseTransformerPayload(payload);
       }
     }
   }
@@ -222,12 +258,89 @@ class MqttService {
   }
 
   void _emitMetrics() {
+    _lastMetricsAt = DateTime.now();
     _metricsController.add({
       'voltage': _voltage,
       'current': _current,
       'power': _power,
     });
     print('📊 Metrics Updated: V=$_voltage, I=$_current, P=$_power');
+  }
+
+  void _parseTransformerPayload(String payload) {
+    try {
+      final decoded = json.decode(payload);
+      if (decoded is! Map) return;
+
+      bool updated = false;
+      final voltage = _parseMetricValue(decoded['voltage']);
+      final current = _parseMetricValue(decoded['current']);
+      final power = _parseMetricValue(decoded['power']);
+
+      if (voltage != null) {
+        _voltage = voltage;
+        updated = true;
+      }
+      if (current != null) {
+        _current = current;
+        updated = true;
+      }
+      if (power != null) {
+        _power = power;
+        updated = true;
+      }
+
+      if (updated) {
+        _emitMetrics();
+      }
+    } catch (e) {
+      print('⚠️ Failed to parse transformer payload: $e');
+    }
+  }
+
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  double? _parseMetricPayload(String payload) {
+    final direct = double.tryParse(payload);
+    if (direct != null) return direct;
+
+    // Allow payloads like "182.80 V" or "voltage=182.80"
+    final match = RegExp(r'[-+]?[0-9]*\.?[0-9]+').firstMatch(payload);
+    if (match == null) return null;
+    return double.tryParse(match.group(0) ?? '');
+  }
+
+  double? _parseMetricValue(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return _parseMetricPayload(value);
+    return null;
+  }
+
+  bool _isVoltageTopic(String topic) {
+    return topic == topicVoltage ||
+        topic == topicTransformerVoltage ||
+      topic == topicTransformerBareVoltage ||
+        topic.endsWith('/voltage');
+  }
+
+  bool _isCurrentTopic(String topic) {
+    return topic == topicCurrent ||
+        topic == topicTransformerCurrent ||
+      topic == topicTransformerBareCurrent ||
+        topic.endsWith('/current');
+  }
+
+  bool _isPowerTopic(String topic) {
+    return topic == topicPower ||
+        topic == topicTransformerPower ||
+      topic == topicTransformerBarePower ||
+        topic.endsWith('/power');
   }
 
   void _publishMessage(String topic, String message, {bool retain = false}) {

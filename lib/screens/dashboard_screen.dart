@@ -21,36 +21,35 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final MqttService _mqttService = MqttService();
-  StreamSubscription<Map<String, double>>? _metricsSubscription;
-
-  // MQTT metrics with fallback to SmartMeter values
-  double? _mqttVoltage;
-  double? _mqttCurrent;
-  double? _mqttPower;
+  Timer? _metricsRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _mqttService.registerScreen();
-    _connectAndSubscribe();
+    _connectMqtt();
+    _startMetricsRefresh();
   }
 
-  Future<void> _connectAndSubscribe() async {
-    final connected = await _mqttService.connect();
-    if (connected) {
-      _metricsSubscription = _mqttService.metricsStream.listen((metrics) {
-        setState(() {
-          _mqttVoltage = metrics['voltage'];
-          _mqttCurrent = metrics['current'];
-          _mqttPower = metrics['power'];
-        });
-      });
+  Future<void> _connectMqtt() async {
+    await _mqttService.connect();
+    if (mounted) {
+      setState(() {});
     }
+  }
+
+  void _startMetricsRefresh() {
+    _metricsRefreshTimer?.cancel();
+    _metricsRefreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_selectedIndex != 0) return;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
-    _metricsSubscription?.cancel();
+    _metricsRefreshTimer?.cancel();
     _mqttService.disposeScreen();
     super.dispose();
   }
@@ -132,6 +131,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildMqttStatus(),
+          const SizedBox(height: 12),
           // Meter Info Header
           _buildMeterInfoCard(),
           const SizedBox(height: 16),
@@ -160,6 +161,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 12),
           _buildDynamicPricing(),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMqttStatus() {
+    final lastAt = _mqttService.lastMetricsAt;
+    final lastText = lastAt == null
+        ? 'No MQTT metrics yet'
+        : 'Last MQTT update: ${lastAt.toLocal().toIso8601String()}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _mqttService.isConnected
+              ? Colors.green.withAlpha(100)
+              : Colors.red.withAlpha(100),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _mqttService.isConnected ? Icons.cloud_done : Icons.cloud_off,
+            color: _mqttService.isConnected ? Colors.green : Colors.red,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              lastText,
+              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            _mqttService.isConnected ? 'MQTT OK' : 'MQTT OFF',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _mqttService.isConnected ? Colors.green : Colors.red,
+            ),
+          ),
         ],
       ),
     );
@@ -251,84 +297,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildMeterInfoItem(
-                  'Current Usage',
-                  '${widget.smartMeter.currentUsage} kW',
-                ),
-                _buildMeterInfoItem(
-                  'Voltage',
-                  '${widget.smartMeter.voltage} V',
-                ),
-                _buildMeterInfoItem(
-                  'Power Factor',
-                  widget.smartMeter.powerFactor.toString(),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMeterInfoItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildRealTimeMetrics() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: [
-        _buildMetricCard(
-          'Voltage',
-          '${_mqttVoltage ?? widget.smartMeter.voltage} V',
-          Icons.bolt,
-          Colors.orange,
-        ),
-        _buildMetricCard(
-          'Current',
-          '${(_mqttCurrent ?? widget.smartMeter.current).toStringAsFixed(2)} A',
-          Icons.electric_bolt,
-          Colors.blue,
-        ),
-        _buildMetricCard(
-          'Power',
-          '${(_mqttPower ?? widget.smartMeter.currentUsage).toStringAsFixed(2)} kW',
-          Icons.power,
-          Colors.purple,
-        ),
-        _buildMetricCard(
-          'Power Factor',
-          widget.smartMeter.powerFactor.toString(),
-          Icons.speed,
-          Colors.teal,
-        ),
-      ],
+    return StreamBuilder<Map<String, double>>(
+      stream: _mqttService.metricsStream,
+      builder: (context, snapshot) {
+        final metrics = snapshot.data;
+        final voltage = metrics?['voltage'] ??
+            (_mqttService.voltage > 0 ? _mqttService.voltage : null) ??
+            widget.smartMeter.voltage;
+        final current = metrics?['current'] ??
+            (_mqttService.current > 0 ? _mqttService.current : null) ??
+            widget.smartMeter.current;
+        final power = metrics?['power'] ??
+            (_mqttService.power > 0 ? _mqttService.power : null) ??
+            widget.smartMeter.currentUsage;
+        final apparentPower = voltage * current;
+        final powerFactor = apparentPower > 0
+          ? ((power * 1000.0) / apparentPower).clamp(0.0, 1.0)
+          : widget.smartMeter.powerFactor;
+
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          children: [
+            _buildMetricCard(
+              'Voltage',
+              '${voltage.toStringAsFixed(2)} V',
+              Icons.bolt,
+              Colors.orange,
+            ),
+            _buildMetricCard(
+              'Current',
+              '${(current * 1000).toStringAsFixed(0)} mA',
+              Icons.electric_bolt,
+              Colors.blue,
+            ),
+            _buildMetricCard(
+              'Power',
+              '${power.toStringAsFixed(2)} kW',
+              Icons.power,
+              Colors.purple,
+            ),
+            _buildMetricCard(
+              'Power Factor',
+              powerFactor.toStringAsFixed(2),
+              Icons.speed,
+              Colors.teal,
+            ),
+          ],
+        );
+      },
     );
   }
 
