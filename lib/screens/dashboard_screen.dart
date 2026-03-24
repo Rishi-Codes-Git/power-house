@@ -309,18 +309,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, snapshot) {
         final metrics = snapshot.data;
         final voltage = metrics?['voltage'] ??
-            (_mqttService.voltage > 0 ? _mqttService.voltage : null) ??
-            widget.smartMeter.voltage;
+            (_mqttService.voltage > 0 ? _mqttService.voltage : null);
         final current = metrics?['current'] ??
-            (_mqttService.current > 0 ? _mqttService.current : null) ??
-            widget.smartMeter.current;
+            (_mqttService.current > 0 ? _mqttService.current : null);
         final power = metrics?['power'] ??
-            (_mqttService.power > 0 ? _mqttService.power : null) ??
-            widget.smartMeter.currentUsage;
-        final apparentPower = voltage * current;
-        final powerFactor = apparentPower > 0
-          ? ((power * 1000.0) / apparentPower).clamp(0.0, 1.0)
-          : widget.smartMeter.powerFactor;
+            (_mqttService.power > 0 ? _mqttService.power : null);
+        final apparentPower =
+            voltage != null && current != null ? voltage * current : null;
+        final powerFactor =
+            apparentPower != null && apparentPower > 0 && power != null
+            ? ((power * 1000.0) / apparentPower).clamp(0.0, 1.0)
+            : null;
 
         return GridView.count(
           shrinkWrap: true,
@@ -332,25 +331,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             _buildMetricCard(
               'Voltage',
-              '${voltage.toStringAsFixed(2)} V',
+              voltage != null ? '${voltage.toStringAsFixed(2)} V' : '-',
               Icons.bolt,
               Colors.orange,
             ),
             _buildMetricCard(
               'Current',
-              '${(current * 1000).toStringAsFixed(0)} mA',
+              current != null ? '${(current * 1000).toStringAsFixed(0)} mA' : '-',
               Icons.electric_bolt,
               Colors.blue,
             ),
             _buildMetricCard(
               'Power',
-              '${power.toStringAsFixed(2)} kW',
+              power != null ? '${power.toStringAsFixed(2)} kW' : '-',
               Icons.power,
               Colors.purple,
             ),
             _buildMetricCard(
               'Power Factor',
-              powerFactor.toStringAsFixed(2),
+              powerFactor != null ? powerFactor.toStringAsFixed(2) : '-',
               Icons.speed,
               Colors.teal,
             ),
