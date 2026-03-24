@@ -1,0 +1,35 @@
+name: power_house
+description: "Smart Electricity Meter Reading App - Power House"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # UI/UX
+  fl_chart: ^0.68.0
+  google_fonts: ^6.2.1
+  percent_indicator: ^4.2.3
+  syncfusion_flutter_gauges: ^24.2.9
+
+  # Networking - MQTT only (no Firebase)
+  http: ^1.2.0
+  mqtt_client: ^10.2.1
+  provider: ^6.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
