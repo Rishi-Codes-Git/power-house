@@ -49,12 +49,12 @@ class SmartMeter {
       current: 10.65,
       powerFactor: 0.92,
       frequency: 50.02,
-      todayUsage: 18.75,
-      monthlyUsage: 485.32,
-      estimatedBill: 2426.60,
-      solarGeneration: 12.5,
-      gridConsumption: 6.25,
-      peakLoad: 4.8,
+      todayUsage: 0.0,
+      monthlyUsage: 0.0,
+      estimatedBill: 0.0,
+      solarGeneration: 0.0,
+      gridConsumption: 0.0,
+      peakLoad: 0.0,
       tariffType: 'Time of Use',
       currentRate: 5.50,
       isConnected: true,
@@ -62,7 +62,7 @@ class SmartMeter {
       hourlyData: List.generate(24, (index) {
         return HourlyUsage(
           hour: index,
-          usage: 0.5 + (index % 6) * 0.3 + (index > 17 && index < 22 ? 1.5 : 0),
+          usage: 0.0,
         );
       }),
     );
