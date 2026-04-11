@@ -4,7 +4,31 @@ import 'dart:io';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
-enum RelayState { relay1On, relay2On, bothOff }
+// Relay control modes
+enum RelayMode { grid, solar, off }
+
+// Relay snapshot for immutable state
+class RelaySnapshot {
+  final int relayNumber;
+  final double current;
+  final String statusRaw;
+  final bool isOn;
+  final DateTime lastUpdated;
+
+  RelaySnapshot({
+    required this.relayNumber,
+    required this.current,
+    required this.statusRaw,
+    required this.isOn,
+    required this.lastUpdated,
+  });
+
+  RelayMode get inferredMode {
+    if (statusRaw == '10') return RelayMode.grid;
+    if (statusRaw == '01') return RelayMode.solar;
+    return RelayMode.off;
+  }
+}
 
 class MqttService {
   // Singleton pattern
@@ -12,82 +36,80 @@ class MqttService {
   factory MqttService() => _instance;
   MqttService._internal();
 
-  // HiveMQ Cloud broker settings
-  static const String broker =
-      '1f38f79c17c44b53bf84e7e6fd6b165e.s1.eu.hivemq.cloud';
-  static const int port = 8883;
-  static const String username = 'esp32';
-  static const String password = 'Prvn@2005';
+  // Local MQTT Broker settings
+  static const String broker = '192.168.137.1';
+  static const int port = 1883;
   static const String clientId = 'flutter_powerhouse_app';
 
-  // MQTT Topics
-  static const String topicRelay1Command = 'powerhouse/relay1/command';
-  static const String topicRelay1State = 'powerhouse/relay1/state';
-  static const String topicRelay2Command = 'powerhouse/relay2/command';
-  static const String topicRelay2State = 'powerhouse/relay2/state';
-  static const String topicStatus = 'powerhouse/status';
+  // Meter Topics (Subscribe)
+  static const String topicMeterVoltage = 'PowerHouse/meter/voltage';
+  static const String topicMeterCurrent = 'PowerHouse/meter/current';
+  static const String topicMeterRealPower = 'PowerHouse/meter/realpower';
+  static const String topicMeterApparentPower = 'PowerHouse/meter/apparentpower';
+  static const String topicMeterPF = 'PowerHouse/meter/pf';
+  static const String topicMeterKWh = 'PowerHouse/meter/kwh';
 
-  // Metrics Topics
-  static const String topicVoltage = 'powerhouse/metrics/voltage';
-  static const String topicCurrent = 'powerhouse/metrics/current';
-  static const String topicPower = 'powerhouse/metrics/power';
-    static const String topicTransformer = 'powerhouse/transformer';
-    static const String topicTransformerVoltage =
-      'powerhouse/transformer/voltage';
-    static const String topicTransformerCurrent =
-      'powerhouse/transformer/current';
-    static const String topicTransformerPower = 'powerhouse/transformer/power';
-    static const String topicTransformerWildcard = 'powerhouse/transformer/#';
-    static const String topicMetricsWildcard = 'powerhouse/metrics/#';
-    static const String topicTransformerBareVoltage = 'transformer/voltage';
-    static const String topicTransformerBareCurrent = 'transformer/current';
-    static const String topicTransformerBarePower = 'transformer/power';
-    static const String topicTransformerBareWildcard = 'transformer/#';
+  // Relay Topics (Subscribe)
+  static const String topicRelayVoltage = 'PowerHouse/Relays/Voltage';
+  static const String topicRelay1Current = 'PowerHouse/Relays/Relay_1/Current';
+  static const String topicRelay1Status = 'PowerHouse/Relays/Relay_1/Status';
+  static const String topicRelay2Current = 'PowerHouse/Relays/Relay_2/Current';
+  static const String topicRelay2Status = 'PowerHouse/Relays/Relay_2/Status';
+  static const String topicRelay3Current = 'PowerHouse/Relays/Relay_3/Current';
+  static const String topicRelay3Status = 'PowerHouse/Relays/Relay_3/Status';
+  static const String topicRelay4Current = 'PowerHouse/Relays/Relay_4/Current';
+  static const String topicRelay4Status = 'PowerHouse/Relays/Relay_4/Status';
+
+  // Relay Topics (Publish - Control)
+  static const String topicRelay1Control = 'PowerHouse/Relays/Relay_1/Control';
+  static const String topicRelay2Control = 'PowerHouse/Relays/Relay_2/Control';
+  static const String topicRelay3Control = 'PowerHouse/Relays/Relay_3/Control';
+  static const String topicRelay4Control = 'PowerHouse/Relays/Relay_4/Control';
 
   MqttServerClient? _client;
 
-  // Track active screen count to prevent disconnecting while screens are still using it
+  // Track active screen count
   int _activeScreens = 0;
 
-  final StreamController<RelayState> _relayStateController =
-      StreamController<RelayState>.broadcast();
+  // Stream controllers
   final StreamController<bool> _connectionController =
       StreamController<bool>.broadcast();
   final StreamController<Map<String, double>> _metricsController =
       StreamController<Map<String, double>>.broadcast();
+  final StreamController<Map<String, RelaySnapshot>> _relayController =
+      StreamController<Map<String, RelaySnapshot>>.broadcast();
 
-  Stream<RelayState> get relayStateStream => _relayStateController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<Map<String, double>> get metricsStream => _metricsController.stream;
+  Stream<Map<String, RelaySnapshot>> get relayStream => _relayController.stream;
 
-  RelayState _currentState = RelayState.bothOff;
-  RelayState get currentState => _currentState;
-
+  // Connection state
   bool _isConnected = false;
   bool get isConnected => _isConnected;
 
-  String _lastCommand = '';
-  String get lastCommand => _lastCommand;
-
-  String _lastStatus = 'Not connected';
-  String get lastStatus => _lastStatus;
-
-  bool _relay1On = false;
-  bool _relay2On = false;
-
-  bool get relay1On => _relay1On;
-  bool get relay2On => _relay2On;
-
-  // Metrics state
+  // Meter metrics (6 data points)
   double _voltage = 0.0;
   double _current = 0.0;
-  double _power = 0.0;
+  double _realPower = 0.0;
+  double _apparentPower = 0.0;
+  double _powerFactor = 0.0;
+  double _kwh = 0.0;
   DateTime? _lastMetricsAt;
 
   double get voltage => _voltage;
   double get current => _current;
-  double get power => _power;
+  double get power => _realPower;
+  double get apparentPower => _apparentPower;
+  double get powerFactor => _powerFactor;
+  double get kwh => _kwh;
   DateTime? get lastMetricsAt => _lastMetricsAt;
+
+  // Relay data
+  double _relayVoltage = 0.0;
+  Map<String, RelaySnapshot> _relays = {};
+
+  double get relayVoltage => _relayVoltage;
+  Map<String, RelaySnapshot> get relays => _relays;
 
   // Called when a screen starts using the MQTT service
   void registerScreen() {
@@ -100,14 +122,11 @@ class MqttService {
   }
 
   Future<bool> connect() async {
-    // If already connected, just return true
     if (_isConnected && _client != null) {
       return true;
     }
 
     try {
-      _lastStatus = 'Connecting to MQTT broker...';
-
       _client = MqttServerClient.withPort(broker, clientId, port);
       _client!.logging(on: false);
       _client!.keepAlivePeriod = 60;
@@ -116,21 +135,13 @@ class MqttService {
       _client!.onConnected = _onConnected;
       _client!.autoReconnect = true;
 
-      // Set up SSL/TLS (insecure mode for self-signed certs)
-      _client!.secure = true;
-      _client!.securityContext = SecurityContext.defaultContext;
-      _client!.onBadCertificate = (dynamic certificate) => true;
+      // Local broker - no TLS
+      _client!.secure = false;
 
-      // Set Last Will and Testament
+      // No authentication for local broker
       final connMessage = MqttConnectMessage()
           .withClientIdentifier(clientId)
-          .authenticateAs(username, password)
-          .withWillTopic(topicStatus)
-          .withWillMessage('offline')
-          .withWillQos(MqttQos.atLeastOnce)
-          .withWillRetain()
-          .startClean()
-          .withWillRetain();
+          .startClean();
 
       _client!.connectionMessage = connMessage;
 
@@ -138,63 +149,54 @@ class MqttService {
 
       if (_client!.connectionStatus!.state == MqttConnectionState.connected) {
         _isConnected = true;
-        _lastStatus = 'Connected to MQTT broker';
         _connectionController.add(true);
 
-        // Subscribe to state topics
-        _client!.subscribe(topicRelay1State, MqttQos.atLeastOnce);
-        _client!.subscribe(topicRelay2State, MqttQos.atLeastOnce);
-        _client!.subscribe(topicStatus, MqttQos.atLeastOnce);
+        // Subscribe to meter metrics (6 topics)
+        _client!.subscribe(topicMeterVoltage, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMeterCurrent, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMeterRealPower, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMeterApparentPower, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMeterPF, MqttQos.atLeastOnce);
+        _client!.subscribe(topicMeterKWh, MqttQos.atLeastOnce);
 
-        // Subscribe to metrics topics (support both metrics/* and transformer/*)
-        _client!.subscribe(topicVoltage, MqttQos.atLeastOnce);
-        _client!.subscribe(topicCurrent, MqttQos.atLeastOnce);
-        _client!.subscribe(topicPower, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformer, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerVoltage, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerCurrent, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerPower, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerWildcard, MqttQos.atLeastOnce);
-        _client!.subscribe(topicMetricsWildcard, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerBareVoltage, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerBareCurrent, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerBarePower, MqttQos.atLeastOnce);
-        _client!.subscribe(topicTransformerBareWildcard, MqttQos.atLeastOnce);
+        // Subscribe to relay data
+        _client!.subscribe(topicRelayVoltage, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay1Current, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay1Status, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay2Current, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay2Status, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay3Current, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay3Status, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay4Current, MqttQos.atLeastOnce);
+        _client!.subscribe(topicRelay4Status, MqttQos.atLeastOnce);
 
         // Listen to messages
         _client!.updates!.listen(_onMessage);
 
-        // Publish app online status
-        _publishMessage(topicStatus, 'app_online', retain: true);
-
-        print('✅ MQTT Connected successfully');
+        print('✅ Connected to local MQTT broker at $broker:$port');
         return true;
       } else {
         _isConnected = false;
-        _lastStatus = 'Connection failed: ${_client!.connectionStatus!.state}';
         _connectionController.add(false);
-        print('❌ MQTT Connection failed');
+        print('❌ MQTT connection failed: ${_client!.connectionStatus!.state}');
         return false;
       }
     } catch (e) {
       _isConnected = false;
-      _lastStatus = 'Connection error: $e';
       _connectionController.add(false);
-      print('❌ MQTT Connection error: $e');
+      print('❌ MQTT connection error: $e');
       return false;
     }
   }
 
   void _onConnected() {
     _isConnected = true;
-    _lastStatus = 'Connected to MQTT broker';
     _connectionController.add(true);
     print('✅ MQTT Connected');
   }
 
   void _onDisconnected() {
     _isConnected = false;
-    _lastStatus = 'Disconnected from MQTT broker';
     _connectionController.add(false);
     print('❌ MQTT Disconnected');
   }
@@ -208,139 +210,169 @@ class MqttService {
 
       print('📨 MQTT Message: $topic = $payload');
 
-      // Handle relay state updates
-      if (topic == topicRelay1State) {
-        _relay1On = (payload == 'ON' || payload == '1' || payload == 'true');
-        _updateRelayState();
-      } else if (topic == topicRelay2State) {
-        _relay2On = (payload == 'ON' || payload == '1' || payload == 'true');
-        _updateRelayState();
-      } else if (topic == topicStatus) {
-        _lastStatus = 'Device status: $payload';
+      // Meter metrics (6 topics)
+      if (topic == topicMeterVoltage) {
+        _voltage = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
+      } else if (topic == topicMeterCurrent) {
+        _current = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
+      } else if (topic == topicMeterRealPower) {
+        _realPower = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
+      } else if (topic == topicMeterApparentPower) {
+        _apparentPower = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
+      } else if (topic == topicMeterPF) {
+        _powerFactor = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
+      } else if (topic == topicMeterKWh) {
+        _kwh = double.tryParse(payload) ?? 0.0;
+        _lastMetricsAt = DateTime.now();
+        _emitMetrics();
       }
-      // Handle metrics updates
-      else if (_isVoltageTopic(topic)) {
-        final parsed = _parseMetricPayload(payload);
-        if (parsed != null) {
-          _voltage = parsed;
-          _emitMetrics();
-        }
-      } else if (_isCurrentTopic(topic)) {
-        final parsed = _parseMetricPayload(payload);
-        if (parsed != null) {
-          _current = parsed;
-          _emitMetrics();
-        }
-      } else if (_isPowerTopic(topic)) {
-        final parsed = _parseMetricPayload(payload);
-        if (parsed != null) {
-          _power = parsed;
-          _emitMetrics();
-        }
-      } else if (topic == topicTransformer) {
-        _parseTransformerPayload(payload);
+      // Relay voltage
+      else if (topic == topicRelayVoltage) {
+        _relayVoltage = double.tryParse(payload) ?? 0.0;
+        _emitRelayData();
+      }
+      // Relay currents and statuses
+      else if (topic == topicRelay1Current) {
+        _updateRelayCurrent(1, payload);
+      } else if (topic == topicRelay1Status) {
+        _updateRelayStatus(1, payload);
+      } else if (topic == topicRelay2Current) {
+        _updateRelayCurrent(2, payload);
+      } else if (topic == topicRelay2Status) {
+        _updateRelayStatus(2, payload);
+      } else if (topic == topicRelay3Current) {
+        _updateRelayCurrent(3, payload);
+      } else if (topic == topicRelay3Status) {
+        _updateRelayStatus(3, payload);
+      } else if (topic == topicRelay4Current) {
+        _updateRelayCurrent(4, payload);
+      } else if (topic == topicRelay4Status) {
+        _updateRelayStatus(4, payload);
       }
     }
   }
 
-  void _updateRelayState() {
-    if (_relay1On && !_relay2On) {
-      _currentState = RelayState.relay1On;
-    } else if (_relay2On && !_relay1On) {
-      _currentState = RelayState.relay2On;
+  void _updateRelayCurrent(int relayNumber, String payload) {
+    final current = double.tryParse(payload) ?? 0.0;
+    final key = 'relay$relayNumber';
+    final existing = _relays[key];
+
+    if (existing != null) {
+      _relays[key] = RelaySnapshot(
+        relayNumber: relayNumber,
+        current: current,
+        statusRaw: existing.statusRaw,
+        isOn: existing.isOn,
+        lastUpdated: DateTime.now(),
+      );
     } else {
-      _currentState = RelayState.bothOff;
+      _relays[key] = RelaySnapshot(
+        relayNumber: relayNumber,
+        current: current,
+        statusRaw: '00',
+        isOn: false,
+        lastUpdated: DateTime.now(),
+      );
     }
-    _relayStateController.add(_currentState);
-    print(
-      '🔄 Relay State Updated: $_currentState (R1:$_relay1On, R2:$_relay2On)',
-    );
+    _emitRelayData();
+  }
+
+  void _updateRelayStatus(int relayNumber, String payload) {
+    final key = 'relay$relayNumber';
+    final existing = _relays[key];
+    final isOn = (payload == '10' || payload == '01');
+
+    if (existing != null) {
+      _relays[key] = RelaySnapshot(
+        relayNumber: relayNumber,
+        current: existing.current,
+        statusRaw: payload,
+        isOn: isOn,
+        lastUpdated: DateTime.now(),
+      );
+    } else {
+      _relays[key] = RelaySnapshot(
+        relayNumber: relayNumber,
+        current: 0.0,
+        statusRaw: payload,
+        isOn: isOn,
+        lastUpdated: DateTime.now(),
+      );
+    }
+    _emitRelayData();
   }
 
   void _emitMetrics() {
-    _lastMetricsAt = DateTime.now();
     _metricsController.add({
       'voltage': _voltage,
       'current': _current,
-      'power': _power,
+      'realPower': _realPower,
+      'apparentPower': _apparentPower,
+      'pf': _powerFactor,
+      'kwh': _kwh,
     });
-    print('📊 Metrics Updated: V=$_voltage, I=$_current, P=$_power');
+    print(
+      '📊 Metrics: V=$_voltage, I=$_current, P=$_realPower, AP=$_apparentPower, PF=$_powerFactor, kWh=$_kwh',
+    );
   }
 
-  void _parseTransformerPayload(String payload) {
+  void _emitRelayData() {
+    _relayController.add({..._relays});
+    print('🔄 Relay Data Updated');
+  }
+
+  // Control relay with mode: "10" = GRID, "01" = SOLAR, "00" = OFF
+  Future<void> setRelayMode(int relayNumber, RelayMode mode) async {
+    if (!_isConnected || _client == null) {
+      print('❌ Not connected to MQTT broker');
+      return;
+    }
+
+    final controlTopic = _getRelayControlTopic(relayNumber);
+    final payload = _getModePayload(mode);
+
     try {
-      final decoded = json.decode(payload);
-      if (decoded is! Map) return;
-
-      bool updated = false;
-      final voltage = _parseMetricValue(decoded['voltage']);
-      final current = _parseMetricValue(decoded['current']);
-      final power = _parseMetricValue(decoded['power']);
-
-      if (voltage != null) {
-        _voltage = voltage;
-        updated = true;
-      }
-      if (current != null) {
-        _current = current;
-        updated = true;
-      }
-      if (power != null) {
-        _power = power;
-        updated = true;
-      }
-
-      if (updated) {
-        _emitMetrics();
-      }
+      _publishMessage(controlTopic, payload);
+      print('✅ Relay $relayNumber set to $mode');
     } catch (e) {
-      print('⚠️ Failed to parse transformer payload: $e');
+      print('❌ Failed to set relay $relayNumber: $e');
     }
   }
 
-  double? _parseDouble(dynamic value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
+  String _getRelayControlTopic(int relayNumber) {
+    switch (relayNumber) {
+      case 1:
+        return topicRelay1Control;
+      case 2:
+        return topicRelay2Control;
+      case 3:
+        return topicRelay3Control;
+      case 4:
+        return topicRelay4Control;
+      default:
+        return topicRelay1Control;
+    }
   }
 
-  double? _parseMetricPayload(String payload) {
-    final direct = double.tryParse(payload);
-    if (direct != null) return direct;
-
-    // Allow payloads like "182.80 V" or "voltage=182.80"
-    final match = RegExp(r'[-+]?[0-9]*\.?[0-9]+').firstMatch(payload);
-    if (match == null) return null;
-    return double.tryParse(match.group(0) ?? '');
-  }
-
-  double? _parseMetricValue(dynamic value) {
-    if (value == null) return null;
-    if (value is num) return value.toDouble();
-    if (value is String) return _parseMetricPayload(value);
-    return null;
-  }
-
-  bool _isVoltageTopic(String topic) {
-    return topic == topicVoltage ||
-        topic == topicTransformerVoltage ||
-      topic == topicTransformerBareVoltage ||
-        topic.endsWith('/voltage');
-  }
-
-  bool _isCurrentTopic(String topic) {
-    return topic == topicCurrent ||
-        topic == topicTransformerCurrent ||
-      topic == topicTransformerBareCurrent ||
-        topic.endsWith('/current');
-  }
-
-  bool _isPowerTopic(String topic) {
-    return topic == topicPower ||
-        topic == topicTransformerPower ||
-      topic == topicTransformerBarePower ||
-        topic.endsWith('/power');
+  String _getModePayload(RelayMode mode) {
+    switch (mode) {
+      case RelayMode.grid:
+        return '10';
+      case RelayMode.solar:
+        return '01';
+      case RelayMode.off:
+        return '00';
+    }
   }
 
   void _publishMessage(String topic, String message, {bool retain = false}) {
@@ -362,95 +394,24 @@ class MqttService {
     print('📤 Published to $topic: $message');
   }
 
-  Future<bool> sendCommand(String command) async {
-    if (!_isConnected || _client == null) {
-      _lastStatus = 'Not connected to MQTT';
-      return false;
-    }
-
-    try {
-      if (command == 'RELAY1_ON') {
-        _publishMessage(topicRelay1Command, 'ON');
-        _publishMessage(topicRelay2Command, 'OFF');
-        _lastCommand = 'RELAY1_ON';
-        _lastStatus = 'Transformer ON command sent';
-      } else if (command == 'RELAY2_ON') {
-        _publishMessage(topicRelay1Command, 'OFF');
-        _publishMessage(topicRelay2Command, 'ON');
-        _lastCommand = 'RELAY2_ON';
-        _lastStatus = 'Solar ON command sent';
-      } else if (command == 'ALL_OFF') {
-        _publishMessage(topicRelay1Command, 'OFF');
-        _publishMessage(topicRelay2Command, 'OFF');
-        _lastCommand = 'ALL_OFF';
-        _lastStatus = 'All OFF command sent';
-      }
-
-      // Wait a bit for state update
-      await Future.delayed(const Duration(milliseconds: 500));
-      return true;
-    } catch (e) {
-      _lastStatus = 'Failed to send command: $e';
-      print('❌ Command failed: $e');
-      return false;
-    }
-  }
-
-  // Turn transformer ON (Relay 1 ON, Relay 2 OFF)
-  Future<bool> transformerOn() async {
-    final result = await sendCommand('RELAY1_ON');
-    if (result) {
-      _relay1On = true;
-      _relay2On = false;
-      _updateRelayState();
-    }
-    return result;
-  }
-
-  // Turn transformer OFF / Solar ON (Relay 1 OFF, Relay 2 ON)
-  Future<bool> solarOn() async {
-    final result = await sendCommand('RELAY2_ON');
-    if (result) {
-      _relay1On = false;
-      _relay2On = true;
-      _updateRelayState();
-    }
-    return result;
-  }
-
-  // Turn both OFF
-  Future<bool> allOff() async {
-    final result = await sendCommand('ALL_OFF');
-    if (result) {
-      _relay1On = false;
-      _relay2On = false;
-      _updateRelayState();
-    }
-    return result;
-  }
-
   void disconnect() {
     if (_client != null && _isConnected) {
-      _publishMessage(topicStatus, 'app_offline', retain: true);
       _client!.disconnect();
     }
     _isConnected = false;
     _connectionController.add(false);
   }
 
-  // Called by individual screens - does NOT disconnect the singleton
   void disposeScreen() {
     unregisterScreen();
-    // Don't disconnect - other screens may still be using the connection
   }
 
-  // Only call this when the app is actually closing
   void dispose() {
     if (_activeScreens <= 0) {
       disconnect();
-      _relayStateController.close();
       _connectionController.close();
       _metricsController.close();
+      _relayController.close();
     }
   }
 }

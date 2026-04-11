@@ -15,7 +15,6 @@ class SimulationScreen extends StatefulWidget {
 
 class _SimulationScreenState extends State<SimulationScreen> {
   final MqttService _mqttService = MqttService();
-  StreamSubscription<RelayState>? _relayStateSubscription;
   StreamSubscription<bool>? _connectionSubscription;
 
   // Simulation parameters
@@ -70,8 +69,8 @@ class _SimulationScreenState extends State<SimulationScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connection failed: ${_mqttService.lastStatus}'),
+          const SnackBar(
+            content: Text('Connection failed'),
           ),
         );
       }
@@ -87,11 +86,6 @@ class _SimulationScreenState extends State<SimulationScreen> {
   }
 
   void _listenToMqttState() {
-    _relayStateSubscription = _mqttService.relayStateStream.listen((_) {
-      if (!mounted) return;
-      setState(_syncRelayStateFromService);
-    });
-
     _connectionSubscription = _mqttService.connectionStream.listen((_) {
       if (!mounted) return;
       setState(_syncConnectionStateFromService);
@@ -99,8 +93,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
   }
 
   void _syncRelayStateFromService() {
-    _relay1On = _mqttService.relay1On;
-    _relay2On = _mqttService.relay2On;
+    // Relay state is now tracked locally, not from MQTT service
   }
 
   void _syncConnectionStateFromService() {
@@ -190,8 +183,8 @@ class _SimulationScreenState extends State<SimulationScreen> {
   }
 
   Future<void> _autoSwitchToSolar(String reason) async {
-    final success = await _mqttService.solarOn();
-    if (success) {
+    try {
+      await _mqttService.setRelayMode(2, RelayMode.solar);
       setState(() {
         _relay1On = false;
         _relay2On = true;
@@ -225,13 +218,14 @@ class _SimulationScreenState extends State<SimulationScreen> {
           ),
         );
       }
+    } catch (e) {
+      print('Auto-switch failed: $e');
     }
   }
 
   @override
   void dispose() {
     _healthCheckTimer?.cancel();
-    _relayStateSubscription?.cancel();
     _connectionSubscription?.cancel();
     _mqttService.disposeScreen();
     super.dispose();
@@ -282,42 +276,30 @@ class _SimulationScreenState extends State<SimulationScreen> {
     try {
       if (_relay1On) {
         // Turn off transformer
-        final success = await _mqttService.allOff();
-        if (success) {
-          setState(() {
-            _relay1On = false;
-            _relay2On = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Transformer turned OFF'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${_mqttService.lastStatus}')),
-          );
-        }
+        await _mqttService.setRelayMode(1, RelayMode.off);
+        setState(() {
+          _relay1On = false;
+          _relay2On = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transformer turned OFF'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       } else {
         // Turn on transformer
-        final success = await _mqttService.transformerOn();
-        if (success) {
-          setState(() {
-            _relay1On = true;
-            _relay2On = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Transformer turned ON'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${_mqttService.lastStatus}')),
-          );
-        }
+        await _mqttService.setRelayMode(1, RelayMode.grid);
+        setState(() {
+          _relay1On = true;
+          _relay2On = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transformer turned ON'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(
@@ -339,42 +321,30 @@ class _SimulationScreenState extends State<SimulationScreen> {
     try {
       if (_relay2On) {
         // Turn off solar
-        final success = await _mqttService.allOff();
-        if (success) {
-          setState(() {
-            _relay1On = false;
-            _relay2On = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Solar Panel turned OFF'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${_mqttService.lastStatus}')),
-          );
-        }
+        await _mqttService.setRelayMode(2, RelayMode.off);
+        setState(() {
+          _relay1On = false;
+          _relay2On = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Solar Panel turned OFF'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       } else {
         // Turn on solar
-        final success = await _mqttService.solarOn();
-        if (success) {
-          setState(() {
-            _relay1On = false;
-            _relay2On = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Solar Panel turned ON'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${_mqttService.lastStatus}')),
-          );
-        }
+        await _mqttService.setRelayMode(2, RelayMode.solar);
+        setState(() {
+          _relay1On = false;
+          _relay2On = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Solar Panel turned ON'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(
