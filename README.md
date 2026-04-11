@@ -138,7 +138,8 @@ This project demonstrates how **AI + IoT + renewable energy integration** can tr
 ---
 ## POSTER
 
-![finen (1)](https://github.com/user-attachments/assets/94300ee7-1aa0-4700-a230-132abad311aa)
+<img src="https://github.com/user-attachments/assets/9b5b0f47-ed11-43d7-91f9-694814d8eec6" width="60%"/>
+
 
 
 
@@ -158,7 +159,7 @@ This project demonstrates how **AI + IoT + renewable energy integration** can tr
 
 ## DASHBOARD
 
-<img width="542" height="1999" alt="dashboard" src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" />
+<img src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" width="300"/>
 
 
 
