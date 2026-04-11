@@ -1,20 +1,4 @@
-# power_house
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
+# power house
 # ⚡ Smart Energy Optimization System
 ### Electricity Demand Forecasting & Dynamic Pricing using AI + IoT
 
@@ -28,12 +12,12 @@ The system predicts future demand, applies dynamic pricing, and automatically sw
 ---
 
 ## 🧠 Key Features
-- 📊 Real-time energy monitoring  
-- 🤖 AI-based demand forecasting (LSTM)  
-- 💸 Dynamic Time-of-Day (TOD) pricing  
-- 🔄 Automatic Grid ↔ Solar switching  
-- 🔌 Appliance-level energy tracking  
-- 📱 Mobile app control & recommendations  
+- Real-time energy monitoring  
+- AI-based demand forecasting (LSTM)  
+- Dynamic Time-of-Day (TOD) pricing  
+- Automatic Grid ↔ Solar switching  
+- Appliance-level energy tracking  
+- Mobile app control & recommendations  
 
 ---
 
@@ -50,6 +34,36 @@ Grid + Solar → Smart Meter (ESP32) → AI Model → Decision System → User A
 - Dual Channel Relays (for switching)  
 - Solar Panel + Battery  
 - DC to AC Converter  
+
+---
+
+## POSTER
+
+<img src="https://github.com/user-attachments/assets/9b5b0f47-ed11-43d7-91f9-694814d8eec6" width="60%"/>
+
+---
+
+## LOGIN
+
+<img width="271" height="603" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
+
+---
+
+## USER DETAILS
+
+<img width="271" height="734" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
+
+---
+
+## SIMULATION
+
+<img width="271" height="1080" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
+
+---
+
+## DASHBOARD
+
+<img src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" width="300"/>
 
 ---
 
@@ -136,30 +150,6 @@ Monitor → Predict → Decide → Control → Optimize
 This project demonstrates how **AI + IoT + renewable energy integration** can transform traditional energy systems into intelligent, adaptive, and efficient solutions.
 
 ---
-## POSTER
-
-<img src="https://github.com/user-attachments/assets/9b5b0f47-ed11-43d7-91f9-694814d8eec6" width="60%"/>
-
-
-
-
-## LOGIN
-
-<img width="271" height="603" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
-
-## USER DETAILS
-
-<img width="271" height="734" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
-
-## SIMULATION
-
-<img width="271" height="1080" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
-
-
-
-## DASHBOARD
-
-<img src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" width="300"/>
 
 
 
