@@ -144,20 +144,15 @@ This project demonstrates how **AI + IoT + renewable energy integration** can tr
 
 ## LOGIN
 
-<img width="542" height="1206" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
-
-
+<img width="271" height="603" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
 
 ## USER DETAILS
 
-<img width="542" height="1469" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
-
-
-
+<img width="271" height="734" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
 
 ## SIMULATION
 
-<img width="542" height="2161" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
+<img width="271" height="1080" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
 
 
 
