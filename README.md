@@ -1,4 +1,4 @@
-# power_house
+# power house
 # ⚡ Smart Energy Optimization System
 ### Electricity Demand Forecasting & Dynamic Pricing using AI + IoT
 
