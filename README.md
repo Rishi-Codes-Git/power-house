@@ -138,19 +138,32 @@ Monitor → Predict → Decide → Control → Optimize
 This project demonstrates how **AI + IoT + renewable energy integration** can transform traditional energy systems into intelligent, adaptive, and efficient solutions.
 
 ---
-## poster
+## POSTER
+
 ![finen (1)](https://github.com/user-attachments/assets/94300ee7-1aa0-4700-a230-132abad311aa)
 
-##login
+
+
+## LOGIN
+
 <img width="542" height="1206" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
 
-## user deetailss
+
+
+## USER DETAILS
+
 <img width="542" height="1206" alt="login" src="https://github.com/user-attachments/assets/fe24a28a-1189-4a25-ba8a-8c0cd45df77b" />
 
-## simulation
+
+
+## SIMULATION
+
 <img width="542" height="2161" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
 
-## dashboard
+
+
+## DASHBOARD
+
 <img width="542" height="1999" alt="dashboard" src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" />
 
 
