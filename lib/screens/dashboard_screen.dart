@@ -8,6 +8,8 @@ import '../services/mqtt_service.dart';
 import 'login_screen.dart';
 import 'simulation_screen.dart';
 import 'prediction_screen.dart';
+import 'socket_control_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final SmartMeter smartMeter;
@@ -59,8 +61,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return _buildDashboardContent();
       case 1:
-        return const SimulationScreen();
+        return const SocketControlScreen();
       case 2:
+        return const SimulationScreen();
+      case 3:
         return const PredictionScreen();
       default:
         return _buildDashboardContent();
@@ -86,6 +90,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.person_outline),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    );
+                  },
+                ),
+                IconButton(
                   icon: const Icon(Icons.notifications_outlined),
                   onPressed: () {},
                 ),
@@ -109,6 +122,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icon(Icons.dashboard_outlined, color: Colors.grey),
             selectedIcon: Icon(Icons.dashboard, color: AppTheme.primaryGreen),
             label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_input_component_outlined, color: Colors.grey),
+            selectedIcon: Icon(Icons.settings_input_component, color: AppTheme.primaryGreen),
+            label: 'Socket Control',
           ),
           NavigationDestination(
             icon: Icon(Icons.tune_outlined, color: Colors.grey),
