@@ -37,6 +37,36 @@ Grid + Solar → Smart Meter (ESP32) → AI Model → Decision System → User A
 
 ---
 
+## POSTER
+
+<img src="https://github.com/user-attachments/assets/9b5b0f47-ed11-43d7-91f9-694814d8eec6" width="60%"/>
+
+---
+
+## LOGIN
+
+<img width="271" height="603" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
+
+---
+
+## USER DETAILS
+
+<img width="271" height="734" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
+
+---
+
+## SIMULATION
+
+<img width="271" height="1080" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
+
+---
+
+## DASHBOARD
+
+<img src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" width="300"/>
+
+---
+
 ## 🔍 Working Principle
 
 ### 1. Power Input
@@ -120,30 +150,6 @@ Monitor → Predict → Decide → Control → Optimize
 This project demonstrates how **AI + IoT + renewable energy integration** can transform traditional energy systems into intelligent, adaptive, and efficient solutions.
 
 ---
-## POSTER
-
-<img src="https://github.com/user-attachments/assets/9b5b0f47-ed11-43d7-91f9-694814d8eec6" width="60%"/>
-
-
-
-
-## LOGIN
-
-<img width="271" height="603" alt="login" src="https://github.com/user-attachments/assets/1c7e3416-627c-4b3a-b8d1-2fdc3349a786" />
-
-## USER DETAILS
-
-<img width="271" height="734" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
-
-## SIMULATION
-
-<img width="271" height="1080" alt="simulation" src="https://github.com/user-attachments/assets/8d941232-8cab-45e0-a591-27401ddbea0b" />
-
-
-
-## DASHBOARD
-
-<img src="https://github.com/user-attachments/assets/444b4f9f-be2b-4bac-a6e5-037fa154d225" width="300"/>
 
 
 
