@@ -93,8 +93,6 @@ IF PF ≥ 0.9 → Use Grid
 IF PF < 0.9 → Switch to Solar
 
 
-> ⚠️ Note: In advanced implementation, switching also considers predicted load conditions.
-
 ---
 
 ## 📊 AI Model (LSTM)
