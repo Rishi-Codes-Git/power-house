@@ -152,7 +152,8 @@ This project demonstrates how **AI + IoT + renewable energy integration** can tr
 
 ## USER DETAILS
 
-<img width="542" height="1206" alt="login" src="https://github.com/user-attachments/assets/fe24a28a-1189-4a25-ba8a-8c0cd45df77b" />
+<img width="542" height="1469" alt="details" src="https://github.com/user-attachments/assets/2e9e1940-ae2f-44ec-bbb5-8ff323065298" />
+
 
 
 
