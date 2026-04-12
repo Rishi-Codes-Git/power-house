@@ -326,54 +326,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
       stream: _mqttService.metricsStream,
       builder: (context, snapshot) {
         final metrics = snapshot.data;
-        final voltage = metrics?['voltage'] ??
-            (_mqttService.voltage > 0 ? _mqttService.voltage : null);
-        final current = metrics?['current'] ??
-            (_mqttService.current > 0 ? _mqttService.current : null);
-        final power = metrics?['power'] ??
-            (_mqttService.power > 0 ? _mqttService.power : null);
-        final apparentPower =
-            voltage != null && current != null
-            ? voltage * (current / 1000.0)
-            : null;
-        final powerFactor =
-            apparentPower != null && apparentPower > 0 && power != null
-            ? ((power * 1000.0) / apparentPower).clamp(0.0, 1.0)
-            : null;
+        final voltage = metrics?['voltage'] ?? (_mqttService.voltage > 0 ? _mqttService.voltage : null);
+        final current = metrics?['current'] ?? (_mqttService.current > 0 ? _mqttService.current : null);
+        final realPower = metrics?['realPower'] ?? (_mqttService.power > 0 ? _mqttService.power : null);
+        final apparentPower = metrics?['apparentPower'] ?? (_mqttService.apparentPower > 0 ? _mqttService.apparentPower : null);
+        final powerFactor = metrics?['pf'] ?? (_mqttService.powerFactor > 0 ? _mqttService.powerFactor : null);
+        final kwh = metrics?['kwh'] ?? (_mqttService.kwh > 0 ? _mqttService.kwh : null);
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.5,
-          children: [
-            _buildMetricCard(
-              'Voltage',
-              voltage != null ? '${voltage.toStringAsFixed(2)} V' : '-',
-              Icons.bolt,
-              Colors.orange,
-            ),
-            _buildMetricCard(
-              'Current',
-              current != null ? '${current.toStringAsFixed(0)} mA' : '-',
-              Icons.electric_bolt,
-              Colors.blue,
-            ),
-            _buildMetricCard(
-              'Power',
-              power != null ? '${power.toStringAsFixed(2)} kW' : '-',
-              Icons.power,
-              Colors.purple,
-            ),
-            _buildMetricCard(
-              'Power Factor',
-              powerFactor != null ? powerFactor.toStringAsFixed(2) : '-',
-              Icons.speed,
-              Colors.teal,
-            ),
-          ],
+        final cards = [
+          _buildMetricCard(
+            'Voltage',
+            voltage != null ? '${voltage.toStringAsFixed(2)} V' : '-',
+            Icons.bolt,
+            Colors.orange,
+          ),
+          _buildMetricCard(
+            'Current',
+            current != null ? '${current.toStringAsFixed(2)} A' : '-',
+            Icons.electric_bolt,
+            Colors.blue,
+          ),
+          _buildMetricCard(
+            'Real Power',
+            realPower != null ? '${realPower.toStringAsFixed(2)} kW' : '-',
+            Icons.power,
+            Colors.purple,
+          ),
+          _buildMetricCard(
+            'Apparent Power',
+            apparentPower != null ? '${apparentPower.toStringAsFixed(2)} kVA' : '-',
+            Icons.flash_on,
+            Colors.deepOrange,
+          ),
+          _buildMetricCard(
+            'Power Factor',
+            powerFactor != null ? powerFactor.toStringAsFixed(2) : '-',
+            Icons.speed,
+            Colors.teal,
+          ),
+          _buildMetricCard(
+            'Energy',
+            kwh != null ? '${kwh.toStringAsFixed(3)} kWh' : '-',
+            Icons.battery_charging_full,
+            Colors.lightGreen,
+          ),
+        ];
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 700;
+            return GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: isWide ? 3 : 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: isWide ? 2.0 : 1.6,
+              children: cards,
+            );
+          },
         );
       },
     );
