@@ -206,7 +206,7 @@ class MqttService {
       final topic = message.topic;
       final payload = MqttPublishPayload.bytesToStringAsString(
         (message.payload as MqttPublishMessage).payload.message,
-      );
+      ).trim();
 
       print('📨 MQTT Message: $topic = $payload');
 
@@ -343,6 +343,7 @@ class MqttService {
 
     try {
       _publishMessage(controlTopic, payload);
+      _updateRelayStatus(relayNumber, payload);
       print('✅ Relay $relayNumber set to $mode');
     } catch (e) {
       print('❌ Failed to set relay $relayNumber: $e');
