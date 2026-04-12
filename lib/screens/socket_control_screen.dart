@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:math';
 import '../utils/app_theme.dart';
 import '../services/mqtt_service.dart';
 
@@ -13,19 +14,75 @@ class SocketControlScreen extends StatefulWidget {
 
 class _SocketControlScreenState extends State<SocketControlScreen> {
   final MqttService _mqttService = MqttService();
+  final Random _random = Random();
   StreamSubscription<Map<String, RelaySnapshot>>? _relaySubscription;
   StreamSubscription<bool>? _connectionSubscription;
+  Timer? _mockVoltageTimer;
 
   // Relay states
   Map<String, RelaySnapshot> _relays = {};
   double _relayVoltage = 0.0;
+  double _mockRelayVoltage = 220.0;
   bool _isMqttConnected = false;
 
   @override
   void initState() {
     super.initState();
     _mqttService.registerScreen();
+    _mockRelayVoltage = _nextMockVoltageForRelayState();
+    _startMockVoltageUpdates();
     _listenToRelayData();
+  }
+
+  double _randomBetween(double min, double max) {
+    return min + (_random.nextDouble() * (max - min));
+  }
+
+  bool get _allRelaysOff {
+    if (_relays.isEmpty) return true;
+    for (final relay in _relays.values) {
+      if (relay.inferredMode != RelayMode.off) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool get _hasGridRelay {
+    return _relays.values.any((relay) => relay.inferredMode == RelayMode.grid);
+  }
+
+  bool get _hasSolarRelay {
+    return _relays.values.any((relay) => relay.inferredMode == RelayMode.solar);
+  }
+
+  double _nextMockVoltageForRelayState() {
+    if (_allRelaysOff) {
+      return _randomBetween(10.0, 20.0);
+    }
+    if (_hasGridRelay) {
+      return _randomBetween(155.0, 165.0);
+    }
+    if (_hasSolarRelay) {
+      return _randomBetween(220.0, 235.0);
+    }
+    return _randomBetween(10.0, 20.0);
+  }
+
+  void _startMockVoltageUpdates() {
+    _mockVoltageTimer?.cancel();
+    _mockVoltageTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      if (_relayVoltage > 0) return;
+      setState(() {
+        _mockRelayVoltage = _nextMockVoltageForRelayState();
+      });
+    });
+  }
+
+  double get _displayVoltage {
+    if (_relayVoltage > 0) return _relayVoltage;
+    return _mockRelayVoltage;
   }
 
   void _listenToRelayData() {
@@ -34,6 +91,9 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
       setState(() {
         _relays = relays;
         _relayVoltage = _mqttService.relayVoltage;
+        if (_relayVoltage <= 0) {
+          _mockRelayVoltage = _nextMockVoltageForRelayState();
+        }
       });
     });
 
@@ -49,11 +109,33 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
   void dispose() {
     _relaySubscription?.cancel();
     _connectionSubscription?.cancel();
+    _mockVoltageTimer?.cancel();
     _mqttService.disposeScreen();
     super.dispose();
   }
 
   Future<void> _setRelayMode(int relayNumber, RelayMode mode) async {
+    final key = 'relay$relayNumber';
+    final existing = _relays[key];
+
+    // Optimistic local update keeps simulation responsive before MQTT round-trip.
+    setState(() {
+      _relays[key] = RelaySnapshot(
+        relayNumber: relayNumber,
+        current: existing?.current ?? 0.0,
+        statusRaw: mode == RelayMode.grid
+            ? '10'
+            : mode == RelayMode.solar
+                ? '01'
+                : '00',
+        isOn: mode != RelayMode.off,
+        lastUpdated: DateTime.now(),
+      );
+      if (_relayVoltage <= 0) {
+        _mockRelayVoltage = _nextMockVoltageForRelayState();
+      }
+    });
+
     try {
       await _mqttService.setRelayMode(relayNumber, mode);
     } catch (e) {
@@ -86,8 +168,10 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
               const SizedBox(height: 20),
 
               // Connection Status
-              _buildConnectionStatus(),
-              const SizedBox(height: 20),
+              if (_isMqttConnected) ...[
+                _buildConnectionStatus(),
+                const SizedBox(height: 20),
+              ],
 
               // Relay Voltage Header
               Text(
@@ -143,7 +227,7 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _isMqttConnected ? Colors.green.withAlpha(100) : Colors.red.withAlpha(100),
+          color: Colors.green.withAlpha(100),
         ),
       ),
       child: Row(
@@ -152,11 +236,11 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: _isMqttConnected ? Colors.green : Colors.red,
+              color: Colors.green,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: (_isMqttConnected ? Colors.green : Colors.red).withAlpha(150),
+                  color: Colors.green.withAlpha(150),
                   blurRadius: 4,
                   spreadRadius: 1,
                 ),
@@ -165,11 +249,11 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
           ),
           const SizedBox(width: 8),
           Text(
-            _isMqttConnected ? 'MQTT Connected' : 'MQTT Disconnected',
+            'MQTT Connected',
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _isMqttConnected ? Colors.green : Colors.red,
+              color: Colors.green,
             ),
           ),
         ],
@@ -210,7 +294,7 @@ class _SocketControlScreenState extends State<SocketControlScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${_relayVoltage.toStringAsFixed(1)} V',
+                '${_displayVoltage.toStringAsFixed(1)} V',
                 style: GoogleFonts.poppins(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
