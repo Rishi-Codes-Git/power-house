@@ -184,10 +184,12 @@ class _SimulationScreenState extends State<SimulationScreen> {
 
   Future<void> _autoSwitchToSolar(String reason) async {
     try {
-      await _mqttService.setRelayMode(2, RelayMode.solar);
+      await _setAllRelays(
+        RelayMode.solar,
+        transformerOn: false,
+        solarOn: true,
+      );
       setState(() {
-        _relay1On = false;
-        _relay2On = true;
         _countdownSeconds = 0;
         _countdownReason = '';
       });
@@ -263,6 +265,22 @@ class _SimulationScreenState extends State<SimulationScreen> {
     _cachedSimulatedData = null;
   }
 
+  Future<void> _setAllRelays(
+    RelayMode mode, {
+    required bool transformerOn,
+    required bool solarOn,
+  }) async {
+    for (int relay = 1; relay <= 4; relay++) {
+      await _mqttService.setRelayMode(relay, mode);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _relay1On = transformerOn;
+      _relay2On = solarOn;
+    });
+  }
+
   Future<void> _toggleTransformer() async {
     if (!_isMqttConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,28 +293,28 @@ class _SimulationScreenState extends State<SimulationScreen> {
 
     try {
       if (_relay1On) {
-        // Turn off transformer
-        await _mqttService.setRelayMode(1, RelayMode.off);
-        setState(() {
-          _relay1On = false;
-          _relay2On = false;
-        });
+        // Both sources off -> all relays OFF (00)
+        await _setAllRelays(
+          RelayMode.off,
+          transformerOn: false,
+          solarOn: false,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Transformer turned OFF'),
+            content: Text('All relays set to OFF (00)'),
             duration: Duration(seconds: 2),
           ),
         );
       } else {
-        // Turn on transformer
-        await _mqttService.setRelayMode(1, RelayMode.grid);
-        setState(() {
-          _relay1On = true;
-          _relay2On = false;
-        });
+        // Transformer selected -> all relays GRID (10)
+        await _setAllRelays(
+          RelayMode.grid,
+          transformerOn: true,
+          solarOn: false,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Transformer turned ON'),
+            content: Text('All relays set to GRID (10)'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -320,28 +338,28 @@ class _SimulationScreenState extends State<SimulationScreen> {
 
     try {
       if (_relay2On) {
-        // Turn off solar
-        await _mqttService.setRelayMode(2, RelayMode.off);
-        setState(() {
-          _relay1On = false;
-          _relay2On = false;
-        });
+        // Both sources off -> all relays OFF (00)
+        await _setAllRelays(
+          RelayMode.off,
+          transformerOn: false,
+          solarOn: false,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Solar Panel turned OFF'),
+            content: Text('All relays set to OFF (00)'),
             duration: Duration(seconds: 2),
           ),
         );
       } else {
-        // Turn on solar
-        await _mqttService.setRelayMode(2, RelayMode.solar);
-        setState(() {
-          _relay1On = false;
-          _relay2On = true;
-        });
+        // Solar selected -> all relays SOLAR (01)
+        await _setAllRelays(
+          RelayMode.solar,
+          transformerOn: false,
+          solarOn: true,
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Solar Panel turned ON'),
+            content: Text('All relays set to SOLAR (01)'),
             duration: Duration(seconds: 2),
           ),
         );

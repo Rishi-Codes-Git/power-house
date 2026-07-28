@@ -42,12 +42,12 @@ class MqttService {
   static const String clientId = 'flutter_powerhouse_app';
 
   // Meter Topics (Subscribe)
-  static const String topicMeterVoltage = 'PowerHouse/meter/voltage';
-  static const String topicMeterCurrent = 'PowerHouse/meter/current';
-  static const String topicMeterRealPower = 'PowerHouse/meter/realpower';
-  static const String topicMeterApparentPower = 'PowerHouse/meter/apparentpower';
-  static const String topicMeterPF = 'PowerHouse/meter/pf';
-  static const String topicMeterKWh = 'PowerHouse/meter/kwh';
+  static const String topicMeterVoltage = 'energy/voltage';
+  static const String topicMeterCurrent = 'energy/current';
+  static const String topicMeterRealPower = 'energy/realpower';
+  static const String topicMeterApparentPower = 'energy/apparentpower';
+  static const String topicMeterPF = 'energy/pf';
+  static const String topicMeterKWh = 'energy/kwh';
 
   // Relay Topics (Subscribe)
   static const String topicRelayVoltage = 'PowerHouse/Relays/Voltage';
